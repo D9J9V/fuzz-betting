@@ -1,5 +1,7 @@
 import { supabase } from "./supabaseClient";
 
+export type PromptStatus = "pending" | "confirmed" | "completed" | "failed";
+
 export const createPrompt = async (
   id: string | bigint,
   gameId: string | bigint,
