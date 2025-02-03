@@ -12,7 +12,7 @@ const deployFuzzBetting: DeployFunction = async function (hre: HardhatRuntimeEnv
   const { deploy } = hre.deployments;
 
   // Configuration parameters
-  const TOKEN_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+  const TOKEN_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const AGENT_A = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
   const AGENT_B = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
 
