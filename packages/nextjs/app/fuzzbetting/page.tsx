@@ -11,7 +11,7 @@ import { createPrompt, getPrompts } from "~~/lib/prompts";
 import { supabase } from "~~/lib/supabaseClient";
 
 // Types
-type PromptStatus = "pending" | "completed" | "failed";
+type PromptStatus = "pending" | "confirmed" | "completed" | "failed";
 
 // interface BlockchainPrompt {
 //   id?: bigint;
@@ -127,98 +127,6 @@ const ApprovalCheck = () => {
 
   return null;
 };
-//////// DEBUG
-const DebugSection = () => {
-  const { address } = useAccount();
-  const { signIn, user } = useAuth();
-  const [debugStatus, setDebugStatus] = useState<string>("");
-
-  const verifyUserExists = async (userAddress: string) => {
-    try {
-      if (!userAddress) {
-        throw new Error("No address provided");
-      }
-      const normalizedAddress = userAddress.toLowerCase();
-      console.log("Checking for address:", normalizedAddress);
-
-      const { data, error } = await supabase.from("users").select("*").eq("address", normalizedAddress).single();
-
-      if (error) {
-        console.error("Error verifying user:", error);
-        return false;
-      }
-
-      return !!data;
-    } catch (error) {
-      console.error("Error in verifyUserExists:", error);
-      return false;
-    }
-  };
-
-  const runTests = async () => {
-    try {
-      setDebugStatus("Starting debug process...");
-
-      if (!address) {
-        throw new Error("No wallet connected");
-      }
-
-      console.log("Starting debug process with address:", address.toLowerCase());
-
-      // 1. Sign in / Create user
-      setDebugStatus("Signing in...");
-      const userData = await signIn();
-      console.log("Sign in completed, user data:", userData);
-
-      if (!userData?.address) {
-        throw new Error("Sign in failed - no address returned");
-      }
-
-      // 2. Verify user exists
-      setDebugStatus("Verifying user...");
-      const userExists = await verifyUserExists(userData.address);
-      console.log("User exists check:", userExists);
-
-      if (!userExists) {
-        throw new Error("User not properly created");
-      }
-
-      // 3. Test Prompt Creation
-      setDebugStatus("Creating test prompt...");
-      const promptId = BigInt(Date.now());
-      const testPrompt = await createPrompt(
-        promptId,
-        BigInt(1),
-        "Test prompt",
-        userData.address,
-        true,
-        "0x" + Date.now().toString(16),
-        BigInt(1),
-      );
-      console.log("Prompt created:", testPrompt);
-
-      setDebugStatus("Debug process completed successfully!");
-    } catch (error) {
-      console.error("Debug error:", error);
-      setDebugStatus(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-3 p-4 bg-base-100 rounded-xl">
-      <h2 className="text-2xl font-bold">Debug</h2>
-      <div className="mt-2 text-sm space-y-1">
-        <p>Connected Wallet: {address || "Not connected"}</p>
-        <p>User Status: {user ? `Signed In as ${user.address}` : "Not Signed In"}</p>
-        {debugStatus && <p className="text-info">Status: {debugStatus}</p>}
-      </div>
-      <button className="btn btn-warning" onClick={runTests} disabled={!address}>
-        Run Debug Tests
-      </button>
-    </div>
-  );
-};
-//////////////
 
 // 3. Main FuzzBetting Component
 export default function FuzzBetting() {
@@ -318,49 +226,38 @@ export default function FuzzBetting() {
 
   const handleBetWithPrompt = async (isAgentA: boolean, promptText: string) => {
     try {
-      if (!address) throw new Error("No wallet connected");
-      if (!currentGameId) throw new Error("No active game");
-      if (!promptText.trim()) throw new Error("Prompt text is required");
-      if (!promptAmount || parseFloat(promptAmount) <= 0) {
-        throw new Error("Invalid bet amount");
-      }
+      if (!address || !currentGameId) throw new Error("Not ready");
 
       setIsProcessing(prev => ({ ...prev, proposing: true }));
 
-      // Create transaction
-      const hash = await betWithPromptAsync({
+      const tx = await betWithPromptAsync({
         functionName: "betWithPrompt",
         args: [isAgentA, parseEther(promptAmount)],
       });
 
-      console.log("Transaction hash:", hash);
+      // Calculate promptId
+      const promptId = (Number(currentGameId) * 100000 + Number(promptCounter)).toString();
 
-      if (!hash) throw new Error("Transaction failed");
-
-      // Create prompt in database using transaction hash
+      // Create database entry with confirmed status
       await createPrompt(
-        BigInt(hash), // Using hash as ID
+        promptId,
         currentGameId,
         promptText.trim(),
         address,
         isAgentA,
-        hash.toString(),
-        BigInt(0), // We'll update this later if needed
+        tx.toString(),
+        BigInt(0),
+        "confirmed", // Set initial status as confirmed
       );
 
-      // Refresh prompts
       await fetchPrompts();
       await mergeBchainAndDbPrompts();
 
-      // Reset form
       setPromptText("");
       setPromptAmount("");
-
-      // Show success message if needed
-      console.log("Prompt created successfully!");
     } catch (error) {
-      console.error("Error creating prompt:", error);
-      setError(error instanceof Error ? error.message : "Failed to create prompt");
+      console.error("Error in handleBetWithPrompt:", error);
+      throw error;
     } finally {
       setIsProcessing(prev => ({ ...prev, proposing: false }));
     }
@@ -390,65 +287,57 @@ export default function FuzzBetting() {
 
   // Call merge function
   const mergeBchainAndDbPrompts = async () => {
-    if (!currentGameId || !currentPrompts) {
-      console.log("Missing data for merge:", { currentGameId, currentPrompts });
-      return;
-    }
+    if (!currentGameId || !currentPrompts) return;
 
     try {
       setIsLoadingPrompts(true);
 
-      // Log the raw blockchain prompts for debugging
-      console.log("Raw blockchain prompts:", currentPrompts);
-
-      // Get Supabase prompts with relationships
-      const dbPrompts = await getPrompts(currentGameId);
-      console.log("Database prompts:", dbPrompts);
-
-      // Type assert and transform blockchain prompts
-      const bchainPrompts = (currentPrompts as any[]).map((bp: any) => ({
-        id: bp.id?.toString() || "unknown",
-        gameId: bp.gameId?.toString() || currentGameId.toString(),
-        creator: bp.creator || "unknown",
-        isAgentA: !!bp.isAgentA,
-        votes: BigInt(bp.votes?.toString() || "0"),
-        exists: !!bp.exists,
-      }));
-
-      console.log("Transformed blockchain prompts:", bchainPrompts);
-
-      const merged: CombinedPrompt[] = bchainPrompts
+      const bchainPrompts = (currentPrompts as any[])
         .filter(bp => bp.exists)
-        .map(bchainPrompt => {
-          const dbPrompt = dbPrompts.find(p => p.id === bchainPrompt.id);
-          console.log("Matching prompt:", { bchainPrompt, dbPrompt });
-
-          // Calculate total votes from database if available
-          const totalVotes = dbPrompt?.votes
-            ? dbPrompt.votes
-                .reduce((sum: number, vote: { amount: string }) => {
-                  return sum + parseFloat(vote.amount);
-                }, 0)
-                .toString()
-            : "0";
-
+        .map((bp: any, index) => {
+          const promptId = (Number(currentGameId) * 100000 + (index + 1)).toString();
           return {
-            id: bchainPrompt.id,
-            gameId: bchainPrompt.gameId,
-            creator: bchainPrompt.creator,
-            isAgentA: bchainPrompt.isAgentA,
-            votes: bchainPrompt.votes,
-            promptText: dbPrompt?.prompt_text || "Loading...",
-            status: (dbPrompt?.status as PromptStatus) || "pending",
-            totalVotes,
+            id: promptId,
+            gameId: bp.gameId ? bp.gameId.toString() : currentGameId.toString(),
+            creator: bp.creator,
+            isAgentA: !!bp.isAgentA,
+            votes: BigInt(bp.votes?.toString() || "0"),
+            exists: !!bp.exists,
           };
         });
 
-      console.log("Merged prompts:", merged);
+      // Get database prompts
+      const dbPrompts = await getPrompts(currentGameId);
+      console.log("Database prompts:", dbPrompts);
+
+      // Merge with better status handling
+      const merged: CombinedPrompt[] = bchainPrompts.map(bchainPrompt => {
+        const dbPrompt = dbPrompts.find(p => p.id === bchainPrompt.id || p.game_id === bchainPrompt.gameId);
+
+        // Determine status based on blockchain and database state
+        let status: PromptStatus = "pending";
+        if (dbPrompt) {
+          status = (dbPrompt.status as PromptStatus) || "confirmed";
+        } else if (bchainPrompt.exists) {
+          status = "confirmed"; // If it exists on blockchain but not in DB
+        }
+
+        return {
+          id: bchainPrompt.id,
+          gameId: bchainPrompt.gameId,
+          creator: bchainPrompt.creator,
+          isAgentA: bchainPrompt.isAgentA,
+          votes: bchainPrompt.votes,
+          promptText: dbPrompt?.prompt_text || `Prompt #${bchainPrompt.id}`,
+          status: status,
+          totalVotes: formatEther(bchainPrompt.votes),
+        };
+      });
+
+      console.log("Final merged prompts:", merged);
       setCombinedPrompts(merged);
     } catch (error) {
-      console.error("Error merging prompts:", error);
-      setError(error instanceof Error ? error.message : "Error merging prompts");
+      console.error("Error in mergeBchainAndDbPrompts:", error);
     } finally {
       setIsLoadingPrompts(false);
     }
@@ -475,7 +364,8 @@ export default function FuzzBetting() {
 
       try {
         await handleBetWithPrompt(isAgentA, promptText.trim());
-        setPromptText("");
+        setPromptText(""); // Reset after successful submission
+        setPromptAmount(""); // Also reset amount
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to submit prompt");
       } finally {
@@ -495,7 +385,10 @@ export default function FuzzBetting() {
           <textarea
             placeholder="Enter your prompt for the AIs..."
             value={promptText}
-            onChange={e => setPromptText(e.target.value)}
+            onChange={e => {
+              e.preventDefault();
+              setPromptText(e.target.value);
+            }}
             className="textarea textarea-bordered h-24"
             disabled={isSubmitting}
           />
@@ -705,7 +598,6 @@ export default function FuzzBetting() {
       {error && <ErrorDisplay error={error} onDismiss={() => setError(null)} />}
       <ApprovalCheck />
       <StatsSection />
-      <DebugSection />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ProposalSection />
         <BettingSection />

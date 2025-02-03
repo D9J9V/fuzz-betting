@@ -1,42 +1,27 @@
 import { supabase } from "./supabaseClient";
 
 export const createPrompt = async (
-  promptId: bigint,
-  gameId: bigint,
+  id: string | bigint,
+  gameId: string | bigint,
   promptText: string,
   creatorAddress: string,
   isAgentA: boolean,
   txHash: string,
-  blockNumber: bigint,
+  votes: bigint,
+  status: PromptStatus = "confirmed", // Add status parameter with default
 ) => {
-  const normalizedAddress = creatorAddress.toLowerCase();
+  const { data, error } = await supabase.from("prompts").insert({
+    id: id.toString(),
+    game_id: gameId.toString(),
+    prompt_text: promptText,
+    creator_address: creatorAddress,
+    is_agent_a: isAgentA,
+    tx_hash: txHash,
+    status: status,
+    block_number: "0", // You might want to get the actual block number
+  });
 
-  // Add error handling for required fields
-  if (!promptText || !normalizedAddress || !txHash) {
-    throw new Error("Missing required fields");
-  }
-
-  const { data, error } = await supabase
-    .from("prompts")
-    .insert({
-      id: promptId.toString(),
-      game_id: gameId.toString(),
-      prompt_text: promptText,
-      creator_address: normalizedAddress,
-      is_agent_a: isAgentA,
-      tx_hash: txHash,
-      block_number: blockNumber.toString(),
-      status: "pending",
-      created_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Database error:", error);
-    throw error;
-  }
-
+  if (error) throw error;
   return data;
 };
 
