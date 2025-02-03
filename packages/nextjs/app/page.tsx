@@ -11,60 +11,62 @@ const Home: NextPage = () => {
 
   return (
     <>
-      <div className="flex items-center flex-col flex-grow pt-10">
-        <div className="px-5">
-          <h1 className="text-center">
-            <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">Scaffold-ETH 2</span>
-          </h1>
-          <div className="flex justify-center items-center space-x-2 flex-col sm:flex-row">
-            <p className="my-2 font-medium">Connected Address:</p>
-            <Address address={connectedAddress} />
-          </div>
-
-          <p className="text-center text-lg">
-            Get started by editing{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/nextjs/app/page.tsx
-            </code>
-          </p>
-          <p className="text-center text-lg">
-            Edit your smart contract{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              YourContract.sol
-            </code>{" "}
-            in{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/hardhat/contracts
-            </code>
-          </p>
+      <div className="flex flex-col items-center justify-center w-full h-screen bg-gradient-to-br from-primary to-base-100 text-primary-content">
+        <div className="text-center mb-10">
+          <h1 className="text-5xl font-extrabold drop-shadow-lg">Welcome to FuzzBetting!</h1>
+          <p className="text-2xl mt-4 animate-fadeIn">Bet on AI-driven prompts and have fun!</p>
         </div>
 
-        <div className="flex-grow bg-base-300 w-full mt-16 px-8 py-12">
-          <div className="flex justify-center items-center gap-12 flex-col sm:flex-row">
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BugAntIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Tinker with your smart contract using the{" "}
-                <Link href="/debug" passHref className="link">
-                  Debug Contracts
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <MagnifyingGlassIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Explore your local transactions with the{" "}
-                <Link href="/blockexplorer" passHref className="link">
-                  Block Explorer
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
+        <div className="mb-6">
+          <Link href="/fuzzbetting">
+            <button className="bg-yellow-400 hover:bg-yellow-500 text-base-100 font-bold py-2 px-4 rounded-full shadow-lg transition-transform transform hover:scale-105">
+              <span className="text-3xl">🚀 Start Playing</span>
+            </button>
+          </Link>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-around w-full max-w-screen-lg mb-12">
+          <div className="flex flex-col bg-base-100 text-primary-content p-6 rounded-lg shadow-lg max-w-xs text-center mt-4 sm:mt-0">
+            <MagnifyingGlassIcon className="h-12 w-12 mx-auto text-blue-600" />
+            <h3 className="text-2xl font-bold mt-4">Block Explorer</h3>
+            <p className="mt-2">Explore your local transactions</p>
+            <Link href="/blockexplorer">
+              <p className="text-lg mt-2 text-blue-600 hover:text-blue-800 cursor-pointer">Explore Now</p>
+            </Link>
+          </div>
+
+          {/* New Card Linking to About Page */}
+          <div className="flex flex-col bg-base-100 text-primary-content p-6 rounded-lg shadow-lg max-w-xs text-center mt-4 sm:mt-0">
+            <h3 className="text-2xl font-bold mt-4">About FuzzBetting</h3>
+            <p className="mt-2">Learn the rules and explore cool use cases.</p>
+            <Link href="/about">
+              <p className="text-lg mt-2 text-blue-600 hover:text-blue-800 cursor-pointer">View About Page</p>
+            </Link>
           </div>
         </div>
+
+        {connectedAddress && (
+          <div className="mt-4">
+            <p className="text-lg">
+              Connected Address: <Address address={connectedAddress} />
+            </p>
+          </div>
+        )}
       </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 1s ease forwards;
+        }
+      `}</style>
     </>
   );
 };
